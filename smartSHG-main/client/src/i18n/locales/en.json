@@ -244,5 +244,21 @@
     "language": "Language",
     "english": "English",
     "telugu": "తెలుగు"
+  },
+  "contributions": {
+    "title": "Monthly Savings & Contributions",
+    "subtitle": "Track monthly obligations, carried-forward dues, and online payments",
+    "payNow": "Pay Now (Razorpay TEST)",
+    "pendingBalance": "Pending Balance",
+    "carriedForward": "Carried Forward from Previous Month",
+    "totalPayable": "Total Payable",
+    "amountPaid": "Amount Paid",
+    "testMode": "TEST MODE: Razorpay test credentials. No real money charged."
+  },
+  "bankManager": {
+    "title": "Bank Manager Dashboard",
+    "loanReview": "Loan Application Review",
+    "approveTerms": "Approve with Terms",
+    "verificationStatus": "Offline Verification Status"
   }
 }

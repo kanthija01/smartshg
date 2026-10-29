@@ -134,9 +134,8 @@ async function disburseLoan({ loanId, disbursedByUser, disbursementMethod = 'BAN
   if (loan.status !== 'APPROVED') {
     throw new Error(`Cannot disburse loan in '${loan.status}' status. Loan must be APPROVED first.`);
   }
-
   const now = new Date();
-  loan.status = 'DISBURSED';
+  loan.status = 'ACTIVE';
   loan.startDate = now;
   loan.disbursedBy = disbursedByUser._id;
   loan.disbursedAt = now;
@@ -214,8 +213,8 @@ async function recordRepayment({ loanId, amount, paymentMethod = 'CASH', referen
 
   const loan = await Loan.findById(loanId).populate('memberId');
   if (!loan) throw new Error('Loan not found');
-  if (loan.status !== 'DISBURSED') {
-    throw new Error(`Cannot repay loan in '${loan.status}' status. Loan must be DISBURSED.`);
+  if (!['ACTIVE', 'DISBURSED'].includes(loan.status)) {
+    throw new Error(`Cannot repay loan in '${loan.status}' status. Loan must be ACTIVE.`);
   }
 
   const receiptNumber = `RCP-LN-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;

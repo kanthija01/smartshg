@@ -15,6 +15,9 @@ const reportRoutes = require('./routes/reportRoutes');
 const schemeRoutes = require('./routes/schemeRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const auditRoutes = require('./routes/auditRoutes');
+const contributionRoutes = require('./routes/contributionRoutes');
+const bankManagerRoutes = require('./routes/bankManagerRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 
@@ -66,6 +69,9 @@ app.use('/api/groups/:groupId/reports', reportRoutes);
 app.use('/api/groups/:groupId/audit', auditRoutes);
 app.use('/api/schemes', schemeRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/groups/:groupId/contributions', contributionRoutes);
+app.use('/api/bank-manager', bankManagerRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Error Handling
 app.use(notFound);

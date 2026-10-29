@@ -11,29 +11,39 @@ import {
   CalendarDays,
   LogOut,
   Building2,
+  CreditCard,
+  ShieldCheck,
 } from 'lucide-react';
 
 export const Sidebar = ({ onCloseMobile }) => {
   const { t } = useTranslation();
   const { user, isHead, isMember, activeGroup, logout } = useAuth();
 
-  const navItems = [
-    { to: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
-    ...(isHead
-      ? [
-          { to: '/members', label: t('nav.members'), icon: Users },
-          { to: '/savings', label: t('nav.savings'), icon: PiggyBank },
-          { to: '/cash-bank', label: t('nav.cashBank'), icon: Landmark },
-          { to: '/loans', label: t('nav.loans'), icon: HandCoins },
-          { to: '/meetings', label: t('nav.meetings'), icon: CalendarDays },
-        ]
-      : [
-          { to: '/savings', label: t('nav.mySavings'), icon: PiggyBank },
-          { to: '/loans', label: t('nav.myLoans'), icon: HandCoins },
-          { to: '/meetings', label: t('nav.myAttendance'), icon: CalendarDays },
-          { to: '/savings', label: t('nav.mySavings'), icon: PiggyBank },
-        ]),
-  ];
+  const isBankManager = user?.role === 'BANK_MANAGER';
+
+  const navItems = isBankManager
+    ? [
+        { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { to: '/bank-manager', label: 'Loan Review', icon: ShieldCheck },
+      ]
+    : [
+        { to: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
+        ...(isHead
+          ? [
+              { to: '/members', label: t('nav.members'), icon: Users },
+              { to: '/savings', label: t('nav.savings'), icon: PiggyBank },
+              { to: '/contributions', label: 'Monthly Contributions', icon: CreditCard },
+              { to: '/cash-bank', label: t('nav.cashBank'), icon: Landmark },
+              { to: '/loans', label: t('nav.loans'), icon: HandCoins },
+              { to: '/meetings', label: t('nav.meetings'), icon: CalendarDays },
+            ]
+          : [
+              { to: '/contributions', label: 'My Contributions', icon: CreditCard },
+              { to: '/savings', label: t('nav.mySavings'), icon: PiggyBank },
+              { to: '/loans', label: t('nav.myLoans'), icon: HandCoins },
+              { to: '/meetings', label: t('nav.myAttendance'), icon: CalendarDays },
+            ]),
+      ];
 
   return (
     <aside className="w-64 bg-emerald-950 text-emerald-100 flex flex-col h-full border-r border-emerald-900/60 select-none">
@@ -100,7 +110,7 @@ export const Sidebar = ({ onCloseMobile }) => {
           <div className="overflow-hidden flex-1">
             <p className="text-xs font-semibold text-white truncate">{user?.name}</p>
             <span className="inline-block text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-800/80 text-emerald-200 uppercase tracking-wider mt-0.5">
-              {user?.role === 'HEAD' ? t('roles.head') : t('roles.member')}
+              {user?.role === 'HEAD' ? t('roles.head') : user?.role === 'BANK_MANAGER' ? 'Bank Manager' : t('roles.member')}
             </span>
           </div>
         </div>

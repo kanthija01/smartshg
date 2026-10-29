@@ -336,8 +336,8 @@ export const LoanList = () => {
             </button>
           )}
 
-          {/* Repay Action for Disbursed Loans */}
-          {row.status === 'DISBURSED' && (
+          {/* Repay Action for Active Loans */}
+          {['DISBURSED', 'ACTIVE'].includes(row.status) && (
             <button
               onClick={() => {
                 setRepayTarget(row);
@@ -371,7 +371,7 @@ export const LoanList = () => {
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200/80 pb-2">
-        {['ALL', 'REQUESTED', 'APPROVED', 'DISBURSED', 'CLOSED', 'REJECTED'].map((tab) => (
+        {['ALL', 'REQUESTED', 'UNDER_REVIEW', 'APPROVED', 'ACTIVE', 'CLOSED', 'REJECTED'].map((tab) => (
           <button
             key={tab}
             onClick={() => {
