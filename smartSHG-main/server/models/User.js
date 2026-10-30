@@ -32,7 +32,7 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['HEAD', 'MEMBER'],
+      enum: ['HEAD', 'MEMBER', 'BANK_MANAGER'],
       default: 'MEMBER',
     },
     preferredLanguage: {

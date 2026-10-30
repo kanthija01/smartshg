@@ -129,11 +129,13 @@ const getLoanDetails = async (req, res, next) => {
   }
 };
 
-// @desc    Approve a loan request (HEAD only)
+// @desc    Approve a loan request (HEAD or BANK_MANAGER)
 // @route   PUT /api/groups/:groupId/loans/:loanId/approve
 const approveLoanRequest = async (req, res, next) => {
   try {
     const { loanId } = req.params;
+    // If HEAD approves (internal group approval), use existing approveLoan service
+    // Bank Manager approval is handled via /api/bank-manager route
     const loan = await approveLoan(loanId, req.user);
 
     res.json({

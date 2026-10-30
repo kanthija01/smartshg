@@ -12,6 +12,7 @@ const Expense = require('../models/Expense');
 const Notification = require('../models/Notification');
 const Scheme = require('../models/Scheme');
 const AuditLog = require('../models/AuditLog');
+const MonthlyContribution = require('../models/MonthlyContribution');
 const { calculateReducingBalanceEMI } = require('../utils/emiCalculator');
 
 async function seedDatabase(shouldExit = true) {
@@ -31,6 +32,7 @@ async function seedDatabase(shouldExit = true) {
       Notification.deleteMany({}),
       Scheme.deleteMany({}),
       AuditLog.deleteMany({}),
+      MonthlyContribution.deleteMany({}),
     ]);
 
     console.log('[Seed] Creating demo users...');
@@ -41,6 +43,16 @@ async function seedDatabase(shouldExit = true) {
       phone: '9876543210',
       password: 'password123',
       role: 'HEAD',
+      preferredLanguage: 'en',
+    });
+
+    // Bank Manager demo account
+    const bankManagerUser = await User.create({
+      name: 'Vijay Kumar (Bank Manager)',
+      email: 'vijay.bm@smartshg.org',
+      phone: '9876543220',
+      password: 'password123',
+      role: 'BANK_MANAGER',
       preferredLanguage: 'en',
     });
 
@@ -288,7 +300,7 @@ async function seedDatabase(shouldExit = true) {
       interestMethod: 'REDUCING_BALANCE',
       tenureMonths: 12,
       startDate: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
-      status: 'DISBURSED',
+      status: 'ACTIVE',
       approvedBy: headUser._id,
       approvedAt: new Date(Date.now() - 65 * 24 * 60 * 60 * 1000),
       disbursedBy: headUser._id,
@@ -593,12 +605,60 @@ async function seedDatabase(shouldExit = true) {
       reference: 'SEED_DATA_V1',
     });
 
+    console.log('[Seed] Creating monthly contribution records...');
+    // Create contribution records for last 3 months and current month for all 3 members
+    const members = [member1, member2, member3];
+    const memberUsers = [memberUser1, memberUser2, memberUser3];
+    for (let m = 3; m >= 0; m--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - m);
+      const p = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const dueDate = new Date(d.getFullYear(), d.getMonth(), 10);
+      for (let mi = 0; mi < members.length; mi++) {
+        const isPast = m > 0;
+        // member1 (Lakshmi): partial in current, paid in previous
+        // member2 (Saraswathi): fully paid all months
+        // member3 (Anitha): missed last month, current pending
+        let amountPaid = 0;
+        let status = 'PENDING';
+        let carriedForward = 0;
+
+        if (mi === 0) { // Lakshmi: paid past months, current partial
+          if (m > 1) { amountPaid = 500; status = 'PAID'; }
+          else if (m === 1) { amountPaid = 500; status = 'PAID'; }
+          else { amountPaid = 300; status = 'PARTIAL'; }
+        } else if (mi === 1) { // Saraswathi: all paid
+          amountPaid = 500; status = 'PAID';
+        } else { // Anitha: missed m=1 (last month), others pending/paid
+          if (m > 1) { amountPaid = 500; status = 'PAID'; }
+          else if (m === 1) { amountPaid = 0; status = 'OVERDUE'; carriedForward = 0; }
+          else { carriedForward = 500; amountPaid = 0; status = 'PENDING'; }
+        }
+
+        const totalPayable = 500 + carriedForward;
+        await MonthlyContribution.create({
+          groupId: group._id,
+          memberId: members[mi]._id,
+          userId: memberUsers[mi]._id,
+          period: p,
+          expectedAmount: 500,
+          carriedForwardAmount: carriedForward,
+          totalPayable,
+          amountPaid,
+          pendingBalance: Math.max(0, totalPayable - amountPaid),
+          status,
+          dueDate,
+        });
+      }
+    }
+
     console.log('====================================================');
     console.log('[Seed] DATABASE SEEDED SUCCESSFULLY!');
     console.log('Demo Credentials:');
-    console.log('  HEAD:   radha@smartshg.org    | password: password123 | Phone: 9876543210');
-    console.log('  MEMBER: lakshmi@smartshg.org  | password: password123 | Phone: 9876543211');
-    console.log('  MEMBER: saraswathi@smartshg.org | password: password123 | Phone: 9876543212');
+    console.log('  HEAD:         radha@smartshg.org        | password: password123 | Phone: 9876543210');
+    console.log('  BANK_MANAGER: vijay.bm@smartshg.org     | password: password123 | Phone: 9876543220');
+    console.log('  MEMBER:       lakshmi@smartshg.org      | password: password123 | Phone: 9876543211');
+    console.log('  MEMBER:       saraswathi@smartshg.org   | password: password123 | Phone: 9876543212');
     console.log('====================================================');
 
     if (shouldExit) {

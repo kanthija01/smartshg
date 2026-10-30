@@ -13,6 +13,8 @@ import { SavingsList } from './pages/savings/SavingsList';
 import { LedgerList } from './pages/cash-bank/LedgerList';
 import { LoanList } from './pages/loans/LoanList';
 import { MeetingList } from './pages/meetings/MeetingList';
+import { ContributionPage } from './pages/contributions/ContributionPage';
+import { BankManagerDashboard } from './pages/bank-manager/BankManagerDashboard';
 import { AppLayout } from './components/layout/AppLayout';
 
 const ProtectedRoute = ({ children }) => {
@@ -73,6 +75,8 @@ const App = () => {
         <Route path="/cash-bank" element={<LedgerList />} />
         <Route path="/loans" element={<LoanList />} />
         <Route path="/meetings" element={<MeetingList />} />
+        <Route path="/contributions" element={<ContributionPage />} />
+        <Route path="/bank-manager" element={<BankManagerDashboard />} />
       </Route>
 
       {/* Default */}

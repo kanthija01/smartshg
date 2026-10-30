@@ -53,16 +53,41 @@ const loanSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['REQUESTED', 'APPROVED', 'REJECTED', 'DISBURSED', 'CLOSED'],
+      enum: ['REQUESTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'ACTIVE', 'CLOSED', 'OVERDUE'],
       default: 'REQUESTED',
       index: true,
     },
+    // Applicant details for bank review
+    applicantDetails: {
+      aadhaarLast4: { type: String, trim: true, maxlength: 4 }, // Only last 4 digits stored
+      bankAccountNumber: { type: String, trim: true },
+      bankIfsc: { type: String, trim: true },
+      monthlyIncome: { type: Number },
+      existingLiabilities: { type: String, trim: true },
+    },
+    // Bank Manager review fields
+    bankManagerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    bankReviewedAt: Date,
+    bankVerificationStatus: {
+      type: String,
+      enum: ['NOT_SUBMITTED', 'PENDING', 'DOCUMENTS_CHECKED', 'VERIFIED', 'DECLINED'],
+      default: 'NOT_SUBMITTED',
+    },
+    bankVerificationRemarks: { type: String, trim: true },
+    bankVerifiedDocuments: [{ type: String }], // list of document names checked
     rejectionReason: String,
     approvedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
     approvedAt: Date,
+    // Approved terms (may differ from requested)
+    approvedPrincipal: { type: Number },
+    approvedInterestRate: { type: Number },
+    approvedTenureMonths: { type: Number },
     disbursedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
