@@ -13,6 +13,7 @@ import {
   Building2,
   CreditCard,
   ShieldCheck,
+  Wallet,
 } from 'lucide-react';
 
 export const Sidebar = ({ onCloseMobile }) => {
@@ -38,7 +39,7 @@ export const Sidebar = ({ onCloseMobile }) => {
               { to: '/meetings', label: t('nav.meetings'), icon: CalendarDays },
             ]
           : [
-              { to: '/contributions', label: 'My Contributions', icon: CreditCard },
+              { to: '/my-payments', label: t('myPayments.navLabel'), icon: Wallet },
               { to: '/savings', label: t('nav.mySavings'), icon: PiggyBank },
               { to: '/loans', label: t('nav.myLoans'), icon: HandCoins },
               { to: '/meetings', label: t('nav.myAttendance'), icon: CalendarDays },

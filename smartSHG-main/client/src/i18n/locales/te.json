@@ -260,5 +260,31 @@
     "loanReview": "à°°à±à°£ à°¸à°®à±€à°•à±à°·",
     "approveTerms": "à°¨à°¿à°¬à°‚à°§à°¨à°²à°¤à±‹ à°†à°®à±‹à°¦à°¿à°‚à°šà°‚à°¡à°¿",
     "verificationStatus": "à°§à±ƒà°µà±€à°•à°°à°£ à°¸à±à°¥à°¿à°¤à°¿"
+  },
+  "myPayments": {
+    "title": "నా చెల్లింపులు",
+    "subtitle": "నెలవారీ సభ్యుల వాటాలు, బకాయిలు మరియు ఆన్లైన్ చెల్లింపులు",
+    "navLabel": "నా చెల్లింపులు",
+    "expectedThisMonth": "ఈ నెల వాటా",
+    "carriedForward": "గత నెల బకాయి",
+    "totalPayable": "మొత్తం చెల్లించాల్సింది",
+    "amountPaid": "చెల్లించిన మొత్తం",
+    "pendingBalance": "మిగిలిన బాకీ",
+    "payNowBtn": "₹{{amount}} చెల్లించండి (Razorpay పరీక్ష)",
+    "openingPayment": "చెల్లింపు తెరుచుకుంటోంది...",
+    "paymentHistory": "చెల్లింపు చరిత్ర (గత 12 నెలలు)",
+    "noHistory": "చెల్లింపు చరిత్ర లేదు.",
+    "fullyPaid": "{{period}} కోసం మీ వాటా పూర్తిగా చెల్లించారు. అభినందనలు!",
+    "testModeNote": "పరీక్ష మోడ్: నిజమైన డబ్బు వసూలు చేయబడదు.",
+    "dueBy": "{{day}}వ తేదీకల్లా",
+    "pendingFrom": "గత నెలల నుండి బకాయి",
+    "currentAndCarried": "ప్రస్తుత + బకాయి",
+    "colPeriod": "కాలం",
+    "colExpected": "వాటా",
+    "colCarryFwd": "బకాయి",
+    "colTotalDue": "మొత్తం",
+    "colPaid": "చెల్లించింది",
+    "colPending": "మిగిలింది",
+    "colStatus": "స్థితి"
   }
 }

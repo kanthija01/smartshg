@@ -2,18 +2,26 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
-import { LayoutDashboard, PiggyBank, HandCoins, CalendarDays } from 'lucide-react';
+import { LayoutDashboard, PiggyBank, HandCoins, CalendarDays, Wallet } from 'lucide-react';
 
 export const MobileNav = () => {
   const { t } = useTranslation();
-  const { isHead } = useAuth();
+  const { isHead, isMember } = useAuth();
 
-  const navItems = [
-    { to: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
-    { to: '/savings', label: t('nav.savings'), icon: PiggyBank },
-    { to: '/loans', label: t('nav.loans'), icon: HandCoins },
-    { to: '/meetings', label: t('nav.meetings'), icon: CalendarDays },
-  ];
+  const navItems = isMember
+    ? [
+        { to: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
+        { to: '/my-payments', label: t('myPayments.navLabel'), icon: Wallet },
+        { to: '/savings', label: t('nav.mySavings'), icon: PiggyBank },
+        { to: '/loans', label: t('nav.myLoans'), icon: HandCoins },
+        { to: '/meetings', label: t('nav.myAttendance'), icon: CalendarDays },
+      ]
+    : [
+        { to: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
+        { to: '/savings', label: t('nav.savings'), icon: PiggyBank },
+        { to: '/loans', label: t('nav.loans'), icon: HandCoins },
+        { to: '/meetings', label: t('nav.meetings'), icon: CalendarDays },
+      ];
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 px-2 py-1.5 flex items-center justify-around shadow-lg">
