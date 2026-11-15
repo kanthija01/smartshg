@@ -15,6 +15,7 @@ import { LoanList } from './pages/loans/LoanList';
 import { MeetingList } from './pages/meetings/MeetingList';
 import { ContributionPage } from './pages/contributions/ContributionPage';
 import { BankManagerDashboard } from './pages/bank-manager/BankManagerDashboard';
+import { MyPaymentsPage } from './pages/payments/MyPaymentsPage';
 import { AppLayout } from './components/layout/AppLayout';
 
 const ProtectedRoute = ({ children }) => {
@@ -76,6 +77,7 @@ const App = () => {
         <Route path="/loans" element={<LoanList />} />
         <Route path="/meetings" element={<MeetingList />} />
         <Route path="/contributions" element={<ContributionPage />} />
+        <Route path="/my-payments" element={<MyPaymentsPage />} />
         <Route path="/bank-manager" element={<BankManagerDashboard />} />
       </Route>
 
