@@ -14,21 +14,54 @@ const {
 
 /**
  * Lazily create a Razorpay instance.
- * If credentials are not configured, operations fall back gracefully.
+ * Validates that credentials are real (not placeholder) before initialising.
  */
 let razorpayInstance = null;
 function getRazorpay() {
   if (razorpayInstance) return razorpayInstance;
-  if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
-    throw new Error(
-      "Razorpay credentials not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in your .env file."
+
+  const keyId     = (RAZORPAY_KEY_ID     || "").trim();
+  const keySecret = (RAZORPAY_KEY_SECRET || "").trim();
+
+  // Check missing
+  if (!keyId || !keySecret) {
+    const err = new Error(
+      "Razorpay credentials not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in server/.env"
     );
+    err.statusCode = 503;
+    throw err;
   }
+
+  // Check placeholder values that were never replaced
+  if (
+    keyId.includes("REPLACE_WITH") ||
+    keyId === "rzp_test_xxxxxxxxxxxxxxxx" ||
+    keySecret.includes("REPLACE_WITH") ||
+    keySecret === "xxxxxxxxxxxxxxxxxxxxxxxx"
+  ) {
+    const err = new Error(
+      "Razorpay TEST credentials are still set to placeholder values. " +
+      "1) Go to https://dashboard.razorpay.com/app/keys and switch to TEST MODE. " +
+      "2) Copy your Key ID (rzp_test_...) and Key Secret. " +
+      "3) Paste them into server/.env as RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET. " +
+      "4) Restart the backend server."
+    );
+    err.statusCode = 503;
+    throw err;
+  }
+
+  // Key ID format check
+  if (!keyId.startsWith("rzp_test_") && !keyId.startsWith("rzp_live_")) {
+    const err = new Error(
+      `Invalid Razorpay Key ID format: "${keyId}". ` +
+      "TEST keys start with rzp_test_. Get yours from dashboard.razorpay.com/app/keys"
+    );
+    err.statusCode = 503;
+    throw err;
+  }
+
   const Razorpay = require("razorpay");
-  razorpayInstance = new Razorpay({
-    key_id: RAZORPAY_KEY_ID,
-    key_secret: RAZORPAY_KEY_SECRET,
-  });
+  razorpayInstance = new Razorpay({ key_id: keyId, key_secret: keySecret });
   return razorpayInstance;
 }
 
@@ -54,42 +87,71 @@ const createContributionOrder = async (req, res, next) => {
       return res.status(400).json({ success: false, message: "This month's contribution is already fully paid." });
     }
 
-    const amountToPay = Math.round(contribution.pendingBalance * 100); // Razorpay uses paise
+    const amountToPay = Math.round(contribution.pendingBalance * 100); // paise
     if (amountToPay <= 0) {
       return res.status(400).json({ success: false, message: "No pending balance to pay." });
     }
 
-    const rzp = getRazorpay();
-    const order = await rzp.orders.create({
-      amount: amountToPay,
-      currency: "INR",
-      receipt: `CONT-${contribution._id.toString().slice(-8)}-${Date.now()}`,
-      notes: {
-        groupId: contribution.groupId.toString(),
-        memberId: contribution.memberId._id.toString(),
-        contributionId: contribution._id.toString(),
-        period: contribution.period,
-        type: "MONTHLY_CONTRIBUTION",
-      },
-    });
+    // Get Razorpay instance — throws with statusCode 503 if credentials missing/placeholder
+    let rzp;
+    try {
+      rzp = getRazorpay();
+    } catch (credErr) {
+      return res.status(credErr.statusCode || 503).json({
+        success: false,
+        message: credErr.message,
+        credentialError: true,
+      });
+    }
+
+    let order;
+    try {
+      order = await rzp.orders.create({
+        amount: amountToPay,
+        currency: "INR",
+        receipt: `CONT-${contribution._id.toString().slice(-8)}-${Date.now()}`,
+        notes: {
+          groupId:        contribution.groupId.toString(),
+          memberId:       contribution.memberId._id.toString(),
+          contributionId: contribution._id.toString(),
+          period:         contribution.period,
+          type:           "MONTHLY_CONTRIBUTION",
+        },
+      });
+    } catch (rzpErr) {
+      // Razorpay API errors (bad auth, network, etc.)
+      const msg = rzpErr?.error?.description || rzpErr.message || "Razorpay order creation failed.";
+      const isAuthError =
+        msg.toLowerCase().includes("unauthorized") ||
+        msg.toLowerCase().includes("authentication") ||
+        rzpErr?.statusCode === 401;
+
+      return res.status(isAuthError ? 503 : 502).json({
+        success: false,
+        message: isAuthError
+          ? `Razorpay authentication failed: ${msg}. Verify your KEY_ID and KEY_SECRET in server/.env.`
+          : `Razorpay API error: ${msg}`,
+        credentialError: isAuthError,
+      });
+    }
 
     // Record the payment attempt
     contribution.paymentAttempts.push({
       razorpayOrderId: order.id,
-      amount: contribution.pendingBalance,
-      status: "CREATED",
-      attemptedAt: new Date(),
+      amount:          contribution.pendingBalance,
+      status:          "CREATED",
+      attemptedAt:     new Date(),
     });
     await contribution.save();
 
-    res.json({
-      success: true,
-      orderId: order.id,
-      amount: order.amount,
-      currency: order.currency,
+    return res.json({
+      success:        true,
+      orderId:        order.id,
+      amount:         order.amount,   // paise
+      currency:       order.currency,
       contributionId: contribution._id,
-      period: contribution.period,
-      keyId: RAZORPAY_KEY_ID,
+      period:         contribution.period,
+      keyId:          RAZORPAY_KEY_ID,
     });
   } catch (err) {
     next(err);
@@ -309,3 +371,4 @@ const handleWebhook = async (req, res, next) => {
 };
 
 module.exports = { createContributionOrder, verifyContributionPayment, handleWebhook };
+

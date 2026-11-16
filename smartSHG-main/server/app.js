@@ -47,11 +47,23 @@ app.use('/api/', apiLimiter);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
+  const keyId = process.env.RAZORPAY_KEY_ID || '';
+  const secret = process.env.RAZORPAY_KEY_SECRET || '';
+
+  const razorpayStatus = (() => {
+    if (!keyId || !secret) return 'missing';
+    if (keyId.includes('REPLACE_WITH') || secret.includes('REPLACE_WITH')) return 'placeholder';
+    if (!keyId.startsWith('rzp_test_') && !keyId.startsWith('rzp_live_')) return 'invalid_format';
+    return keyId.startsWith('rzp_test_') ? 'test_configured' : 'live_configured';
+  })();
+
   res.json({
     status: 'ok',
     service: 'SmartSHG Core API',
     time: new Date().toISOString(),
     uptime: process.uptime(),
+    razorpay: razorpayStatus,
+    razorpayKeyPrefix: keyId ? keyId.substring(0, 12) + '...' : 'not_set',
   });
 });
 
