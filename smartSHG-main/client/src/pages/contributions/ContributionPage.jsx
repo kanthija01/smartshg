@@ -94,7 +94,27 @@ export const ContributionPage = () => {
       }
 
       const groupId = activeGroup._id || activeGroup.id;
-      const orderData = await contributionService.createRazorpayOrder(groupId, contribution._id);
+      let orderData;
+      try {
+        orderData = await contributionService.createRazorpayOrder(groupId, contribution._id);
+      } catch (err) {
+        const isCredentialError =
+          err.message?.toLowerCase().includes("credentials not configured") ||
+          err.message?.toLowerCase().includes("razorpay_key");
+        if (isCredentialError) {
+          alert(
+            "Razorpay TEST credentials are not configured.\n\n" +
+            "To fix this:\n" +
+            "1. Open server/.env\n" +
+            "2. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET\n" +
+            "   (Get TEST keys from dashboard.razorpay.com)\n" +
+            "3. Restart the backend server"
+          );
+        } else {
+          alert(err.message || "Failed to create payment order.");
+        }
+        return;
+      }
 
       if (!orderData.success) {
         alert(orderData.message || "Failed to create payment order.");

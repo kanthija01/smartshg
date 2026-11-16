@@ -16,15 +16,14 @@ import {
   Smartphone,
   AlertCircle,
   History,
+  XCircle,
+  Settings,
 } from "lucide-react";
 
-/** Dynamically load Razorpay checkout script */
+/** Dynamically load the Razorpay Checkout script from CDN */
 function loadRazorpayScript() {
   return new Promise((resolve) => {
-    if (window.Razorpay) {
-      resolve(true);
-      return;
-    }
+    if (window.Razorpay) { resolve(true); return; }
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.onload = () => resolve(true);
@@ -32,6 +31,31 @@ function loadRazorpayScript() {
     document.body.appendChild(script);
   });
 }
+
+/** Inline error/status banner shown inside the Pay Now panel */
+const PaymentStatusBanner = ({ type, message, onDismiss }) => {
+  const colors = {
+    error:   "bg-red-50 border-red-200 text-red-900",
+    warning: "bg-amber-50 border-amber-200 text-amber-900",
+    success: "bg-emerald-50 border-emerald-200 text-emerald-900",
+    info:    "bg-blue-50 border-blue-200 text-blue-900",
+  };
+  const icons = {
+    error:   <XCircle className="w-4 h-4 shrink-0 text-red-600" />,
+    warning: <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />,
+    success: <CheckCircle className="w-4 h-4 shrink-0 text-emerald-600" />,
+    info:    <AlertCircle className="w-4 h-4 shrink-0 text-blue-600" />,
+  };
+  return (
+    <div className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs font-medium ${colors[type]}`}>
+      {icons[type]}
+      <span className="flex-1 leading-relaxed">{message}</span>
+      {onDismiss && (
+        <button onClick={onDismiss} className="opacity-60 hover:opacity-100 ml-1 shrink-0">✕</button>
+      )}
+    </div>
+  );
+};
 
 export const MyPaymentsPage = () => {
   const { t } = useTranslation();
@@ -43,6 +67,7 @@ export const MyPaymentsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState(null); // { type, message }
   const [receiptData, setReceiptData] = useState(null);
 
   const groupId = activeGroup?._id || activeGroup?.id;
@@ -65,33 +90,74 @@ export const MyPaymentsPage = () => {
     }
   }, [groupId]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useEffect(() => { loadData(); }, [loadData]);
 
   const handleRazorpayPayment = async () => {
     if (!contribution || contribution.pendingBalance <= 0) return;
-    try {
-      setProcessingPayment(true);
 
+    setPaymentStatus(null);
+    setProcessingPayment(true);
+
+    try {
+      // 1. Load Razorpay checkout.js
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded) {
-        alert("Razorpay script could not be loaded. Please check your internet connection.");
+        setPaymentStatus({
+          type: "error",
+          message: "Could not load Razorpay checkout script. Please check your internet connection and try again.",
+        });
         setProcessingPayment(false);
         return;
       }
 
-      const orderData = await contributionService.createRazorpayOrder(groupId, contribution._id);
+      // 2. Create order on backend
+      let orderData;
+      try {
+        orderData = await contributionService.createRazorpayOrder(groupId, contribution._id);
+      } catch (err) {
+        // Backend throws when RAZORPAY_KEY_ID / SECRET not configured
+        const isCredentialError =
+          err.message?.toLowerCase().includes("credentials not configured") ||
+          err.message?.toLowerCase().includes("razorpay_key");
+
+        if (isCredentialError) {
+          setPaymentStatus({
+            type: "warning",
+            message:
+              "Razorpay TEST credentials are not configured on the server. " +
+              "Open server/.env and set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET " +
+              "with your TEST keys from dashboard.razorpay.com, then restart the backend.",
+          });
+        } else {
+          setPaymentStatus({ type: "error", message: err.message || "Failed to create payment order." });
+        }
+        setProcessingPayment(false);
+        return;
+      }
+
       if (!orderData.success) {
-        alert(orderData.message || "Failed to create payment order.");
+        setPaymentStatus({ type: "error", message: orderData.message || "Failed to create payment order." });
         setProcessingPayment(false);
         return;
       }
 
+      // 3. Validate key received from backend
+      if (!orderData.keyId || orderData.keyId.trim() === "") {
+        setPaymentStatus({
+          type: "warning",
+          message:
+            "Razorpay Key ID was not returned by the server. " +
+            "Ensure RAZORPAY_KEY_ID is set in server/.env and restart the backend.",
+        });
+        setProcessingPayment(false);
+        return;
+      }
+
+      // 4. Open Razorpay Checkout popup
       const options = {
         key: orderData.keyId,
-        amount: orderData.amount,       // in paise
-        currency: orderData.currency,
+        amount: orderData.amount,       // in paise (from backend)
+        currency: orderData.currency || "INR",
         name: activeGroup?.name || "SmartSHG",
         description: `Monthly Savings — ${contribution.period}`,
         order_id: orderData.orderId,
@@ -105,14 +171,26 @@ export const MyPaymentsPage = () => {
           contributionId: contribution._id,
         },
         theme: { color: "#065f46" },
+
+        // 5. Payment success handler — verify on backend BEFORE showing success
         handler: async (response) => {
+          setPaymentStatus({ type: "info", message: "Verifying payment on server…" });
           try {
-            const verifyRes = await contributionService.verifyPayment(groupId, contribution._id, {
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            });
+            const verifyRes = await contributionService.verifyPayment(
+              groupId,
+              contribution._id,
+              {
+                razorpay_order_id:  response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature:  response.razorpay_signature,
+              }
+            );
+
             if (verifyRes.success) {
+              setPaymentStatus({
+                type: "success",
+                message: `Payment of ${formatCurrency(verifyRes.amountPaid)} verified and recorded. Receipt: ${verifyRes.receiptNumber}`,
+              });
               setReceiptData({
                 receiptNumber: verifyRes.receiptNumber,
                 transactionId: response.razorpay_payment_id,
@@ -132,40 +210,51 @@ export const MyPaymentsPage = () => {
                   date: formatDate(new Date()),
                 },
                 issuer: { recordedBy: "Razorpay TEST Gateway" },
-                disclaimer:
-                  "TEST MODE payment. Razorpay TEST credentials used. No real money charged.",
+                disclaimer: "TEST MODE payment. Razorpay TEST credentials used. No real money charged.",
               });
-              loadData();
+              loadData(); // Refresh balances
             } else {
-              alert("Payment verification failed: " + verifyRes.message);
+              setPaymentStatus({
+                type: "error",
+                message: `Payment verification failed: ${verifyRes.message}. Contact your group leader with payment ID: ${response.razorpay_payment_id}`,
+              });
             }
           } catch (e) {
-            alert("Verification error: " + e.message);
+            setPaymentStatus({
+              type: "error",
+              message: `Verification error: ${e.message}. Keep your payment ID: ${response.razorpay_payment_id}`,
+            });
           } finally {
             setProcessingPayment(false);
           }
         },
+
         modal: {
           ondismiss: () => {
             setProcessingPayment(false);
+            setPaymentStatus({ type: "info", message: "Payment was cancelled. You can try again anytime." });
           },
         },
       };
 
       const rzp = new window.Razorpay(options);
       rzp.on("payment.failed", (res) => {
-        alert("Payment failed: " + (res.error?.description || "Unknown error"));
         setProcessingPayment(false);
+        setPaymentStatus({
+          type: "error",
+          message: `Payment failed: ${res.error?.description || "Unknown error"} (Code: ${res.error?.code || "N/A"})`,
+        });
       });
       rzp.open();
+
     } catch (err) {
-      alert(err.message || "Payment initiation failed");
       setProcessingPayment(false);
+      setPaymentStatus({ type: "error", message: err.message || "Payment initiation failed. Please try again." });
     }
   };
 
   if (loading) return <LoadingState message="Loading your payment details..." />;
-  if (error) return <ErrorState message={error} onRetry={loadData} />;
+  if (error)   return <ErrorState message={error} onRetry={loadData} />;
 
   return (
     <div className="space-y-6">
@@ -178,7 +267,7 @@ export const MyPaymentsPage = () => {
 
       {contribution ? (
         <>
-          {/* Summary Cards */}
+          {/* ── Summary Cards ─────────────────────────────────────────── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <SummaryCard
               title={t("myPayments.expectedThisMonth")}
@@ -217,9 +306,10 @@ export const MyPaymentsPage = () => {
             />
           </div>
 
-          {/* Pay Now Panel */}
+          {/* ── Pay Now Panel ──────────────────────────────────────────── */}
           {contribution.pendingBalance > 0 && (
             <div className="bg-white p-6 rounded-2xl border border-emerald-200 shadow-sm space-y-4">
+              {/* Header row */}
               <div className="flex items-start justify-between flex-wrap gap-3">
                 <div>
                   <h3 className="font-bold text-slate-900 text-base">
@@ -232,17 +322,24 @@ export const MyPaymentsPage = () => {
                     </strong>
                     {contribution.carriedForwardAmount > 0 && (
                       <span className="ml-2 text-rose-600 font-medium">
-                        (
-                        {t("myPayments.carryForwardNote", {
+                        ({t("myPayments.carryForwardNote", {
                           amount: formatCurrency(contribution.carriedForwardAmount),
-                        })}
-                        )
+                        })})
                       </span>
                     )}
                   </p>
                 </div>
                 <StatusBadge status={contribution.status} />
               </div>
+
+              {/* Inline payment status feedback */}
+              {paymentStatus && (
+                <PaymentStatusBanner
+                  type={paymentStatus.type}
+                  message={paymentStatus.message}
+                  onDismiss={() => setPaymentStatus(null)}
+                />
+              )}
 
               {/* TEST MODE notice */}
               <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">
@@ -264,15 +361,22 @@ export const MyPaymentsPage = () => {
                   : `Pay ₹${contribution.pendingBalance} Online (Razorpay TEST)`}
               </button>
 
-              {/* Payment method hints */}
+              {/* TEST credentials hint */}
               <div className="text-[11px] text-slate-400 space-y-0.5 pt-1 border-t border-slate-100">
-                <p>Test Card: <span className="font-mono">4111 1111 1111 1111</span> • Expiry: any future date • CVV: any 3 digits</p>
-                <p>Test UPI: <span className="font-mono">success@razorpay</span></p>
+                <p>
+                  Test Card:{" "}
+                  <span className="font-mono text-slate-500">4111 1111 1111 1111</span>
+                  {" "}• Expiry: any future date • CVV: any 3 digits
+                </p>
+                <p>
+                  Test UPI:{" "}
+                  <span className="font-mono text-slate-500">success@razorpay</span>
+                </p>
               </div>
             </div>
           )}
 
-          {/* Fully Paid Banner */}
+          {/* ── Fully Paid Banner ──────────────────────────────────────── */}
           {contribution.pendingBalance === 0 && (
             <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3">
               <CheckCircle className="w-5 h-5 text-emerald-700 shrink-0" />
@@ -289,7 +393,7 @@ export const MyPaymentsPage = () => {
         </div>
       )}
 
-      {/* Payment History Table */}
+      {/* ── Payment History Table ──────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
         <h3 className="font-bold text-slate-900 text-sm mb-4 pb-3 border-b border-slate-100 flex items-center gap-2">
           <History className="w-4 h-4 text-slate-400" />
@@ -324,11 +428,9 @@ export const MyPaymentsPage = () => {
                       {formatCurrency(c.expectedAmount)}
                     </td>
                     <td className="px-3 py-2.5 text-right font-medium">
-                      {c.carriedForwardAmount > 0 ? (
-                        <span className="text-rose-600">{formatCurrency(c.carriedForwardAmount)}</span>
-                      ) : (
-                        <span className="text-slate-300">—</span>
-                      )}
+                      {c.carriedForwardAmount > 0
+                        ? <span className="text-rose-600">{formatCurrency(c.carriedForwardAmount)}</span>
+                        : <span className="text-slate-300">—</span>}
                     </td>
                     <td className="px-3 py-2.5 text-right font-bold text-slate-800">
                       {formatCurrency(c.totalPayable)}
@@ -336,12 +438,10 @@ export const MyPaymentsPage = () => {
                     <td className="px-3 py-2.5 text-right font-semibold text-emerald-700">
                       {formatCurrency(c.amountPaid)}
                     </td>
-                    <td className="px-3 py-2.5 text-right text-slate-500">
-                      {c.pendingBalance > 0 ? (
-                        <span className="text-rose-600 font-medium">{formatCurrency(c.pendingBalance)}</span>
-                      ) : (
-                        <span className="text-emerald-600 font-semibold">Nil</span>
-                      )}
+                    <td className="px-3 py-2.5 text-right">
+                      {c.pendingBalance > 0
+                        ? <span className="text-rose-600 font-medium">{formatCurrency(c.pendingBalance)}</span>
+                        : <span className="text-emerald-600 font-semibold">Nil</span>}
                     </td>
                     <td className="px-3 py-2.5 text-center">
                       <StatusBadge status={c.status} />
@@ -351,9 +451,7 @@ export const MyPaymentsPage = () => {
                         <span className="inline-block px-1.5 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-bold rounded">
                           {c.paymentAttempts.filter((a) => a.status === "CAPTURED").length} paid
                         </span>
-                      ) : (
-                        "—"
-                      )}
+                      ) : "—"}
                     </td>
                   </tr>
                 ))}
@@ -367,7 +465,7 @@ export const MyPaymentsPage = () => {
       {receiptData && (
         <ReceiptModal
           isOpen={Boolean(receiptData)}
-          onClose={() => setReceiptData(null)}
+          onClose={() => { setReceiptData(null); setPaymentStatus(null); }}
           receipt={receiptData}
         />
       )}
