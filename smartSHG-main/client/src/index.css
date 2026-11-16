@@ -4,7 +4,8 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 min-h-screen antialiased font-sans;
+    @apply bg-slate-50 text-slate-900 min-h-screen antialiased;
+    font-family: 'Inter', 'Noto Sans Telugu', sans-serif;
   }
 }
 

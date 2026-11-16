@@ -43,9 +43,13 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('smartshg_user', JSON.stringify(data.user));
       setUser(data.user);
 
-      if (data.user.preferredLanguage) {
-        i18n.changeLanguage(data.user.preferredLanguage);
-        localStorage.setItem('smartshg_lang', data.user.preferredLanguage);
+      if (data.user.preferredLanguage && ['en', 'te'].includes(data.user.preferredLanguage)) {
+        // Only apply if no explicit user preference already saved in browser
+        const existingLang = localStorage.getItem('smartshg_lang');
+        if (!existingLang) {
+          i18n.changeLanguage(data.user.preferredLanguage);
+          localStorage.setItem('smartshg_lang', data.user.preferredLanguage);
+        }
       }
 
       if (data.user.defaultGroup) {
@@ -63,7 +67,7 @@ const register = async (userData) => {
 
     setUser(data.user);
 
-    if (data.user.preferredLanguage) {
+    if (data.user.preferredLanguage && ['en', 'te'].includes(data.user.preferredLanguage)) {
       i18n.changeLanguage(data.user.preferredLanguage);
       localStorage.setItem('smartshg_lang', data.user.preferredLanguage);
     }
